@@ -9,9 +9,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    origin: true, 
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  allowEIO3: true 
 });
 
 let tickets = [
@@ -47,7 +49,7 @@ io.on('connection', (socket) => {
     const ticket = tickets.find(t => t.id === ticketId);
     if (ticket) {
       ticket.resolution = resolutionText || "Unresolved";
-      ticket.lockedBy = null; // Force clear the lock on the server side
+      ticket.lockedBy = null; 
       io.emit('initial_tickets', tickets); // Push down to every single client instantly
     }
   });
