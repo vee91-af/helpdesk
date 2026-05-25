@@ -16,11 +16,11 @@ export default function LiveOpsDashboard() {
     const savedName = localStorage.getItem('agent_name');
     if (savedName) setAgentName(savedName);
 
-    socketRef.current = io('http://localhost:3001', {
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
+   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+socketRef.current = io(BACKEND_URL, {
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+});
     const socket = socketRef.current;
 
     socket.on('connect', () => setIsConnected(true));
