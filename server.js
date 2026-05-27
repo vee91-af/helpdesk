@@ -26,31 +26,31 @@ io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
   socket.emit('initial_tickets', tickets);
 
-  // 1. Lock a ticket
+ 
   socket.on('lock_ticket', ({ ticketId, agentName }) => {
     const ticket = tickets.find(t => t.id === ticketId);
     if (ticket) {
       ticket.lockedBy = agentName;
-      io.emit('initial_tickets', tickets); // Broadcast fresh state to everyone
+      io.emit('initial_tickets', tickets); 
     }
   });
 
-  // 2. Unlock a ticket (Cancel button)
+ 
   socket.on('unlock_ticket', ({ ticketId }) => {
     const ticket = tickets.find(t => t.id === ticketId);
     if (ticket) {
       ticket.lockedBy = null;
-      io.emit('initial_tickets', tickets); // Broadcast fresh state to everyone
+      io.emit('initial_tickets', tickets); 
     }
   });
 
-  // 3. Save Resolution & Force Unlock (Save & Close button)
+ 
   socket.on('update_ticket', ({ ticketId, resolutionText }) => {
     const ticket = tickets.find(t => t.id === ticketId);
     if (ticket) {
       ticket.resolution = resolutionText || "Unresolved";
       ticket.lockedBy = null; 
-      io.emit('initial_tickets', tickets); // Push down to every single client instantly
+      io.emit('initial_tickets', tickets); 
     }
   });
 

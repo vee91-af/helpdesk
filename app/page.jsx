@@ -7,26 +7,35 @@ export default function LiveOpsDashboard() {
   const [agentName, setAgentName] = useState("Agent Marcus");
   const [isConnected, setIsConnected] = useState(true);
   const [tickets, setTickets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTicketId, setActiveTicketId] = useState(null);
   const [resolutionText, setResolutionText] = useState("");
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Dynamically set name for testing split screens
     const savedName = localStorage.getItem('agent_name');
     if (savedName) setAgentName(savedName);
 
-   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-socketRef.current = io(BACKEND_URL, {
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
-});
+    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    
+    socketRef.current = io(BACKEND_URL, {
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
     const socket = socketRef.current;
 
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));
-    socket.on('initial_tickets', (serverTickets) => setTickets(serverTickets));
-    socket.on('ticket_created', (newTicket) => setTickets((prev) => [...prev, newTicket]));
+
+    socket.on('initial_tickets', (serverTickets) => {
+      setTickets(serverTickets);
+      setIsLoading(false);
+    });
+
+    socket.on('ticket_created', (newTicket) => {
+      setTickets((prev) => [...prev, newTicket]);
+    });
 
     socket.on('ticket_locked', ({ ticketId, agentName: lockerName }) => {
       setTickets((prev) => 
@@ -40,10 +49,6 @@ socketRef.current = io(BACKEND_URL, {
       );
     });
 
-   // Change 'ticket_updated' to 'initial_tickets' to match the backend!
-socket.on('initial_tickets', (serverTickets) => {
-  setTickets(serverTickets);
-});
     return () => {
       socket.disconnect();
     };
@@ -74,91 +79,105 @@ socket.on('initial_tickets', (serverTickets) => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1000px', margin: '0 auto', color: '#fff' }}>
-      
+    <div className="p-5 font-sans max-w-[1000px] mx-auto text-white">
       {!isConnected && (
-        <div style={{ background: '#ffebee', color: '#c62828', padding: '12px', borderRadius: '4px', marginBottom: '20px', fontWeight: 'bold' }}>
+        <div className="bg-red-50 text-red-700 p-3 rounded mb-5 font-bold border border-red-200">
           ⚠️ Connection Lost: Reconnecting...
         </div>
       )}
 
-      <h2>Live Ops Helpdesk</h2>
-      <p>Logged in as: <strong style={{ color: '#00e676' }}>{agentName}</strong></p>
+      <h2 className="text-2xl font-bold mb-2">Live Ops Helpdesk</h2>
+      <p className="mb-4">Logged in as: <strong className="text-emerald-400">{agentName}</strong></p>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px', textAlign: 'left' }}>
+      <table className="w-full border-collapse mt-5 text-left">
         <thead>
-          <tr style={{ borderBottom: '2px solid #444' }}>
-            <th style={{ padding: '12px', width: '10%' }}>ID</th>
-            <th style={{ padding: '12px', width: '30%' }}>Issue</th>
-            <th style={{ padding: '12px', width: '30%' }}>Resolution</th>
-            <th style={{ padding: '12px', width: '15%' }}>Status</th>
-            <th style={{ padding: '12px', width: '15%' }}>Action</th>
+          <tr className="border-bottom-2 border-zinc-700">
+            <th className="p-3 w-[10%]">ID</th>
+            <th className="p-3 w-[30%]">Issue</th>
+            <th className="p-3 w-[30%]">Resolution</th>
+            <th className="p-3 w-[15%]">Status</th>
+            <th className="p-3 w-[15%]">Action</th>
           </tr>
         </thead>
         <tbody>
-          {tickets.map(ticket => {
-            const isLocked = ticket.lockedBy !== null;
-            const isLockedByMe = ticket.lockedBy === agentName;
-            const isLockedByOther = isLocked && !isLockedByMe;
+          {isLoading ? (
+            <tr>
+              <td colSpan="5" className="p-8 text-center text-zinc-500 animate-pulse">
+                Establishing secure broker connection...
+              </td>
+            </tr>
+          ) : tickets.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="p-8 text-center text-zinc-500">
+                No active operational tickets found.
+              </td>
+            </tr>
+          ) : (
+            tickets.map(ticket => {
+              const isLocked = ticket.lockedBy !== null;
+              const isLockedByMe = ticket.lockedBy === agentName;
+              const isLockedByOther = isLocked && !isLockedByMe;
 
-            return (
-              <tr 
-                key={ticket.id} 
-                style={{ 
-                  borderBottom: '1px solid #222',
-                  background: isLockedByOther ? '#212121' : 'transparent',
-                  color: isLockedByOther ? '#777' : '#fff'
-                }}
-              >
-                <td style={{ padding: '12px' }}>#{ticket.id}</td>
-                <td style={{ padding: '12px' }}>{ticket.title}</td>
-                <td style={{ padding: '12px', color: '#aaa', fontStyle: 'italic' }}>
-                  {ticket.resolution || "Unresolved"}
-                </td>
-                <td style={{ padding: '12px' }}>
-                  {isLockedByOther ? (
-                    <span style={{ color: '#ff1744' }}>🔒 Locked by {ticket.lockedBy}</span>
-                  ) : (
-                    <span style={{ color: '#00e676' }}>Open</span>
-                  )}
-                </td>
-                <td style={{ padding: '12px' }}>
-                  <button 
-                    onClick={() => handleEditClick(ticket)}
-                    disabled={isLockedByOther || activeTicketId !== null}
-                    style={{
-                      padding: '6px 12px',
-                      cursor: (isLockedByOther || activeTicketId !== null) ? 'not-allowed' : 'pointer',
-                      background: (isLockedByOther || activeTicketId !== null) ? '#444' : '#2979ff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
+              return (
+                <tr 
+                  key={ticket.id} 
+                  className={`border-b border-zinc-800 transition-colors ${
+                    isLockedByOther ? 'bg-zinc-900/50 text-zinc-500' : 'bg-transparent text-white hover:bg-zinc-800/30'
+                  }`}
+                >
+                  <td className="p-3">#{ticket.id}</td>
+                  <td className="p-3">{ticket.title}</td>
+                  <td className="p-3 text-zinc-400 italic">
+                    {ticket.resolution || "Unresolved"}
+                  </td>
+                  <td className="p-3">
+                    {isLockedByOther ? (
+                      <span className="text-red-500 font-medium">🔒 Locked by {ticket.lockedBy}</span>
+                    ) : (
+                      <span className="text-emerald-400 font-medium">Open</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <button 
+                      onClick={() => handleEditClick(ticket)}
+                      disabled={isLockedByOther || activeTicketId !== null}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                        (isLockedByOther || activeTicketId !== null) 
+                        ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'
+                      }`}
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
 
       {activeTicketId && (
-        <div style={{ marginTop: '40px', padding: '20px', border: '1px solid #333', borderRadius: '8px', background: '#111' }}>
-          <h3>Editing Ticket #{activeTicketId}</h3>
+        <div className="mt-10 p-5 border border-zinc-800 rounded-lg bg-zinc-950">
+          <h3 className="text-lg font-semibold mb-3">Editing Ticket #{activeTicketId}</h3>
           <textarea 
             rows={4} 
             value={resolutionText}
             onChange={(e) => setResolutionText(e.target.value)}
-            style={{ width: '100%', marginBottom: '10px', padding: '10px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px' }} 
-            placeholder="Type resolution here..."
+            className="w-full mb-3 p-3 bg-zinc-900 text-white border border-zinc-800 rounded focus:border-blue-500 focus:outline-none"
+            placeholder="Document resolution details..."
           />
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleSaveAndClose} style={{ padding: '8px 16px', background: '#00e676', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleSaveAndClose} 
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded transition-colors"
+            >
               Save & Close
             </button>
-            <button onClick={handleCloseEditor} style={{ padding: '8px 16px', background: '#444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            <button 
+              onClick={handleCloseEditor} 
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded transition-colors"
+            >
               Cancel
             </button>
           </div>
